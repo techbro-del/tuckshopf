@@ -1,0 +1,100 @@
+from flask import Flask, render_template_string, request, redirect, url_for, flash
+import firebase_admin
+from firebase_admin import credentials, firestore
+
+# Initialize Flask app
+app = Flask(_name_)
+app.secret_key = 'your_secret_key'  # Change this to a random secret key
+
+# Initialize Firebase
+cred = credentials.Certificate('path/to/your/serviceAccountKey.json')  # Update the path
+firebase_admin.initialize_app(cred)
+
+# Initialize Firestore
+db = firestore.client()
+
+# HTML Template
+index_template = '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        ul {
+            list-style-type: none;
+        }
+        li {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+        .success { color: green; }
+        .danger { color: red; }
+    </style>
+    <title>Tuckshop</title>
+</head>
+<body>
+    <h1>Welcome to Maelezo Tuckshop</h1>
+    <h2>Available Items</h2>
+    <ul>
+        {% for item in items %}
+            <li>
+                <h3>{{ item.to_dict().get('name') }}</h3>
+                <p>{{ item.to_dict().get('description') }}</p>
+                <p>Price: ${{ item.to_dict().get('price') }}</p>
+                <form action="{{ url_for('order') }}" method="post">
+                    <input type="hidden" name="item_id" value="{{ item.id }}">
+                    <button type="submit">Order Now</button>
+                </form>
+            </li>
+        {% endfor %}
+    </ul>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <ul>
+            {% for category, message in messages %}
+                <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
+</body>
+</html>
+'''
+
+# Home route
+@app.route('/')
+def index():
+    items_ref = db.collection('items')
+    items = items_ref.stream()
+    return render_template_string(index_template, items=items)
+
+# Order route
+@app.route('/order', methods=['POST'])
+def order():
+    item_id = request.form['item_id']
+    item_ref = db.collection('items').document(item_id)
+    item = item_ref.get()
+
+    if item.exists:
+        # Simulate order processing
+        db.collection('orders').add({
+            'item_id': item_id,
+            'status': 'Pending'
+        })
+        flash('Order placed successfully!', 'success')
+    else:
+        flash('Item not found!', 'danger')
+
+    return redirect(url_for('index'))
+
+if _name_ == '_main_':
+    app.run(debug=True)
